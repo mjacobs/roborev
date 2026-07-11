@@ -137,11 +137,11 @@ Pick by how you authenticate to Gemini:
 
 - **Consumer Antigravity / Gemini subscription (OAuth login):** use the
   built-in `gemini` agent via the `agy` CLI. No model selection is possible
-  on this path: with only `agy` installed, roborev errors on an explicit
-  model rather than silently ignoring it (when the legacy `gemini` CLI is
-  also installed, a `--model` override reroutes to that CLI instead — see
-  [Supported Agents](/agents/)). The underlying SDK has no OAuth path, so an
-  ACP bridge cannot restore model selection either.
+  on this path: an explicit model errors whenever the agent resolves to
+  `agy` — even with the legacy `gemini` CLI also installed — unless you pin
+  `gemini_cmd = "gemini"` (see [Supported Agents](/agents/)). The underlying
+  SDK has no OAuth path, so an ACP bridge cannot restore model selection
+  either.
 - **`GEMINI_API_KEY` (AI Studio key):** use the agy-acp bridge above. Full
   model and thinking-suffix selection.
 - **GCP Vertex (application-default credentials):** use the agy-acp bridge
@@ -232,8 +232,10 @@ advertise (say `review_model = "gpt-5.4"` with a Gemini-only agent), the model
 check fails, the job retries, and after retries it silently fails over to the
 backup agent — the review completes, but a different agent served it. On later
 versions this is handled automatically: a workflow model paired with a
-*different* agent no longer overrides your ACP agent's `[acp].model`. Either
-way, an explicit `--model` always wins. To see which agent actually served a
+*different* agent no longer overrides your ACP agent's `[acp].model` (a
+workflow model whose configured workflow agent IS your ACP agent still
+applies, as does a generic `model` when the ACP agent is the default agent).
+Either way, an explicit `--model` always wins. To see which agent actually served a
 job: `roborev show --job <id> --json` and check `job.agent` / `job.model`.
 
 ### `--agent` is ignored and a panel runs instead
