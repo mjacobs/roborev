@@ -230,13 +230,16 @@ workflow-model pairing fix (#955), a global workflow model silently takes
 precedence over `[acp].model`: if it names a model your ACP agent does not
 advertise (say `review_model = "gpt-5.4"` with a Gemini-only agent), the model
 check fails, the job retries, and after retries it silently fails over to the
-backup agent — the review completes, but a different agent served it. On later
-versions this is handled automatically: a workflow model paired with a
-*different* agent no longer overrides your ACP agent's `[acp].model` (a
-workflow model whose configured workflow agent IS your ACP agent still
-applies, as does a generic `model` when the ACP agent is the default agent).
-Either way, an explicit `--model` always wins. To see which agent actually served a
-job: `roborev show --job <id> --json` and check `job.agent` / `job.model`.
+backup agent — the review completes, but a different agent served it. On
+versions that include the pairing fix (#955) this is handled automatically: a
+workflow model paired with a *different* agent no longer overrides your ACP
+agent's `[acp].model` (a workflow model whose configured workflow agent IS
+your ACP agent still applies, as does a generic `model` when the ACP agent is
+the default agent). Either way, an explicit `--model` wins on the
+single-agent path; if `default_panel` is configured, panel member jobs choose
+their own models, so add `--panel none` (see below). To see which agent
+actually served a job: `roborev show --job <id> --json` and check
+`job.agent` / `job.model`.
 
 ### `--agent` is ignored and a panel runs instead
 
