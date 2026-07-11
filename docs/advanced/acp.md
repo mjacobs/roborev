@@ -88,7 +88,11 @@ Then select it anywhere agents are routable: `--agent agy-sdk`, per-workflow
 agents, backup agents, or panel members. Bridge model IDs accept an optional
 thinking suffix (`gemini-3.5-flash:high`), which is how a reasoning level
 reaches the model — roborev's ACP client transmits only mode and model, not
-reasoning.
+reasoning. The suffixed IDs work only because the bridge advertises the
+suffixed strings verbatim in its model list: roborev validates the configured
+model against exact membership of what the agent advertises (for agy-acp, the
+set in `AGY_ACP_MODELS`), so a suffix the bridge does not advertise is
+rejected just like any unknown model.
 
 If the agent process needs environment variables (API keys, cloud project
 settings), remember it is spawned by the **daemon**, which does not inherit
@@ -101,6 +105,45 @@ command = "env"
 args = ["AGY_ACP_VERTEX=1", "AGY_ACP_PROJECT=my-gcp-project", "agy-acp"]
 model = "gemini-3.5-flash"
 ```
+
+The `env` args pattern is for **non-secret** values only. Everything in `args`
+is committed to your TOML config and is visible in the process table
+(`/proc/<pid>/cmdline`) while the agent runs, so never put API keys or tokens
+there. For credentials, point `command` at a protected wrapper script (e.g.
+`chmod 700`, stored outside any repo) that exports the secrets before
+`exec`-ing the bridge:
+
+```toml
+[acp]
+name = "agy-sdk"
+command = "/home/you/.config/roborev/agy-acp-wrapper.sh"
+model = "gemini-3.5-flash"
+```
+
+```bash
+#!/usr/bin/env bash
+# ~/.config/roborev/agy-acp-wrapper.sh  (chmod 700, outside any repo)
+export GEMINI_API_KEY="$(cat "$HOME/.secrets/gemini_api_key")"
+exec agy-acp "$@"
+```
+
+### Which Gemini path should I use?
+
+Pick by how you authenticate to Gemini:
+
+- **Consumer Antigravity / Gemini subscription (OAuth login):** use the
+  built-in `gemini` agent via the `agy` CLI. No model selection is possible —
+  roborev hard-errors on an explicit model, and the underlying SDK has no
+  OAuth path, so an ACP bridge cannot restore it either.
+- **`GEMINI_API_KEY` (AI Studio key):** use the agy-acp bridge above. Full
+  model and thinking-suffix selection.
+- **GCP Vertex (application-default credentials):** use the agy-acp bridge
+  with `AGY_ACP_VERTEX=1` and `AGY_ACP_PROJECT=<project>` (location `global`),
+  or the legacy `gemini` CLI `-m` flag if you are an enterprise user who still
+  has it.
+- **Avoid** routing Gemini through an Anthropic-compat proxy (LiteLLM + the
+  `claude-code` agent) for reviews: reasoning arrives as ordinary text and
+  contaminates the review output.
 
 ## Configuration Reference
 
@@ -175,14 +218,16 @@ The agent doesn't support the requested model. Remove the `model` field from you
 ### Reviews run with a different model (or agent) than configured
 
 Workflow model settings (`review_model`, `fix_model`, and their leveled
-variants) take precedence over the `[acp]` `model` field. If a global workflow
-model names a model your ACP agent does not advertise (say `review_model =
-"gpt-5.4"` with a Gemini-only agent), the model check fails, the job retries,
-and after retries it silently fails over to the backup agent — the review
-completes, but a different agent served it. Pass `--model` explicitly, or
-align the workflow model with the ACP agent. To see which agent actually
-served a job: `roborev show --job <id> --json` and check `job.agent` /
-`job.model`.
+variants) can interact with the `[acp]` `model` field. On versions without the
+workflow-model pairing fix (#955), a global workflow model silently takes
+precedence over `[acp].model`: if it names a model your ACP agent does not
+advertise (say `review_model = "gpt-5.4"` with a Gemini-only agent), the model
+check fails, the job retries, and after retries it silently fails over to the
+backup agent — the review completes, but a different agent served it. On later
+versions this is handled automatically: a workflow model paired with a
+*different* agent no longer overrides your ACP agent's `[acp].model`. Either
+way, an explicit `--model` always wins. To see which agent actually served a
+job: `roborev show --job <id> --json` and check `job.agent` / `job.model`.
 
 ### `--agent` is ignored and a panel runs instead
 
