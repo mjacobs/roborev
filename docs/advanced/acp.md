@@ -95,8 +95,12 @@ set in `AGY_ACP_MODELS`), so a suffix the bridge does not advertise is
 rejected just like any unknown model.
 
 If the agent process needs environment variables (API keys, cloud project
-settings), remember it is spawned by the **daemon**, which does not inherit
-your shell environment. Inject them with an `env` wrapper:
+settings), remember that daemon-run reviews spawn it from the **daemon**,
+which carries the environment the daemon was started with — not your current
+shell. Exports added to your shell after the daemon started are invisible to
+it until a daemon restart (foreground flows like `roborev review --local` do
+use your shell environment). To make the values explicit regardless of how
+the agent is launched, inject them with an `env` wrapper:
 
 ```toml
 [acp]
