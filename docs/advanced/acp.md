@@ -136,9 +136,12 @@ exec agy-acp "$@"
 Pick by how you authenticate to Gemini:
 
 - **Consumer Antigravity / Gemini subscription (OAuth login):** use the
-  built-in `gemini` agent via the `agy` CLI. No model selection is possible —
-  roborev hard-errors on an explicit model, and the underlying SDK has no
-  OAuth path, so an ACP bridge cannot restore it either.
+  built-in `gemini` agent via the `agy` CLI. No model selection is possible
+  on this path: with only `agy` installed, roborev errors on an explicit
+  model rather than silently ignoring it (when the legacy `gemini` CLI is
+  also installed, a `--model` override reroutes to that CLI instead — see
+  [Supported Agents](/agents/)). The underlying SDK has no OAuth path, so an
+  ACP bridge cannot restore model selection either.
 - **`GEMINI_API_KEY` (AI Studio key):** use the agy-acp bridge above. Full
   model and thinking-suffix selection.
 - **GCP Vertex (application-default credentials):** use the agy-acp bridge
