@@ -415,6 +415,25 @@ func (m model) handleHideClosedKey() (tea.Model, tea.Cmd) {
 	return m, m.fetchJobs()
 }
 
+func (m model) handleVerdictFilterKey() (tea.Model, tea.Cmd) {
+	if m.currentView != viewQueue {
+		return m, nil
+	}
+	switch m.activeVerdictFilter {
+	case "":
+		m.activeVerdictFilter = verdictFilterFail
+		m.pushFilter(filterTypeVerdict)
+	case verdictFilterFail:
+		m.activeVerdictFilter = verdictFilterPass
+		m.pushFilter(filterTypeVerdict)
+	default:
+		m.activeVerdictFilter = ""
+		m.removeFilterFromStack(filterTypeVerdict)
+	}
+	m.resetQueueForFilterChange()
+	return m, m.fetchJobs()
+}
+
 // handleToggleClassifyKey flips visibility of auto-design-router
 // classifier rows and skipped design rows in the queue. The toggle
 // is session-only; it overrides show_classify_jobs config until the

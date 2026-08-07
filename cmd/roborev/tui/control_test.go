@@ -88,6 +88,7 @@ func TestBuildStateResponse(t *testing.T) {
 	}
 	m.selectedJobID = 1
 	m.hideClosed = true
+	m.activeVerdictFilter = verdictFilterFail
 
 	resp := m.buildStateResponse()
 	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
@@ -97,17 +98,74 @@ func TestBuildStateResponse(t *testing.T) {
 	assert.Equal(t, "queue", data.View)
 	assert.Equal(t, 2, data.JobCount)
 	assert.True(t, data.HideClosed)
+	assert.Equal(t, verdictFilterFail, data.VerdictFilter)
 }
 
 func TestBuildFilterResponse(t *testing.T) {
 	m := newModel(testEndpoint, withExternalIODisabled())
 	m.activeRepoFilter = []string{"/repo"}
 	m.activeBranchFilter = "main"
+	m.activeVerdictFilter = verdictFilterPass
 	m.lockedRepoFilter = true
 	m.filterStack = []string{"repo", "branch"}
 
 	resp := m.buildFilterResponse()
 	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	encoded, err := json.Marshal(resp.Data)
+	require.NoError(t, err)
+	var data struct {
+		VerdictFilter string `json:"verdict_filter"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &data))
+	assert.Equal(t, verdictFilterPass, data.VerdictFilter)
+}
+
+func TestHandleCtrlSetFilterVerdict(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+
+	params, err := json.Marshal(map[string]string{"verdict": "fail"})
+	require.NoError(t, err)
+	updated, resp, _ := m.handleCtrlSetFilter(params)
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Equal(t, verdictFilterFail, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+
+	params, err = json.Marshal(map[string]string{"verdict": "pass"})
+	require.NoError(t, err)
+	updated, resp, _ = updated.handleCtrlSetFilter(params)
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Equal(t, verdictFilterPass, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+}
+
+func TestHandleCtrlSetFilterRejectsInvalidVerdictWithoutMutation(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+
+	params, err := json.Marshal(map[string]string{"verdict": "unknown"})
+	require.NoError(t, err)
+	updated, resp, cmd := m.handleCtrlSetFilter(params)
+
+	require.False(t, resp.OK)
+	assert.Equal(t, "verdict filter must be fail or pass", resp.Error)
+	assert.Equal(t, verdictFilterFail, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+	assert.Nil(t, cmd)
+}
+
+func TestHandleCtrlClearFilterVerdict(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+
+	params, err := json.Marshal(map[string]bool{"verdict": true})
+	require.NoError(t, err)
+	updated, resp, _ := m.handleCtrlClearFilter(params)
+
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Empty(t, updated.activeVerdictFilter)
+	assert.Empty(t, updated.filterStack)
 }
 
 func TestBuildJobsResponse(t *testing.T) {

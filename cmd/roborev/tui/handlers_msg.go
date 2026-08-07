@@ -114,7 +114,8 @@ func (m model) handleJobsMsg(msg jobsMsg) (tea.Model, tea.Cmd) {
 			// on return to queue.
 		} else if !found {
 			m.selectedIdx = max(0, min(len(m.jobs)-1, m.selectedIdx))
-			if len(m.activeRepoFilter) > 0 || m.hideClosed {
+			if len(m.activeRepoFilter) > 0 || m.activeBranchFilter != "" ||
+				m.activeVerdictFilter != "" || m.hideClosed {
 				idx := m.findNearestVisibleJob(m.selectedIdx)
 				if idx >= 0 {
 					m.selectedIdx = idx

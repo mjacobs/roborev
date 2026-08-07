@@ -148,6 +148,8 @@ func (m model) handleGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleBranchFilterOpenKey()
 	case "h":
 		return m.handleHideClosedKey()
+	case "H":
+		return m.handleVerdictFilterKey()
 	case "s":
 		return m.handleToggleClassifyKey()
 	case "c":
@@ -677,7 +679,7 @@ func (m model) handleHelpKey() (tea.Model, tea.Cmd) {
 func (m model) handleEscKey() (tea.Model, tea.Cmd) {
 	if m.currentView == viewQueue && len(m.filterStack) > 0 {
 		popped := m.popFilter()
-		if popped == filterTypeRepo || popped == filterTypeBranch {
+		if popped == filterTypeRepo || popped == filterTypeBranch || popped == filterTypeVerdict {
 			m.resetQueueForFilterChange()
 			return m, m.fetchJobs()
 		}

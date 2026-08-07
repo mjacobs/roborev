@@ -274,6 +274,18 @@ func (m model) isJobVisible(job storage.ReviewJob) bool {
 	if m.activeBranchFilter != "" && !m.branchMatchesFilter(job) {
 		return false
 	}
+	if m.activeVerdictFilter != "" {
+		if job.Verdict == nil {
+			return false
+		}
+		want := "F"
+		if m.activeVerdictFilter == verdictFilterPass {
+			want = "P"
+		}
+		if *job.Verdict != want {
+			return false
+		}
+	}
 	if m.hideClosed {
 		// Hide closed reviews, failed jobs, and canceled jobs
 		// Check pendingClosed first for optimistic updates (avoids flash on filter)
@@ -333,6 +345,8 @@ func (m *model) popFilter() string {
 			m.recomputeClassifyEffective()
 		case filterTypeBranch:
 			m.activeBranchFilter = ""
+		case filterTypeVerdict:
+			m.activeVerdictFilter = ""
 		}
 		m.queueColGen++
 		return ft

@@ -24,7 +24,8 @@ import (
 )
 
 func (m model) getVisibleJobs() []storage.ReviewJob {
-	if len(m.activeRepoFilter) == 0 && m.activeBranchFilter == "" && !m.hideClosed {
+	if len(m.activeRepoFilter) == 0 && m.activeBranchFilter == "" &&
+		m.activeVerdictFilter == "" && !m.hideClosed {
 		return m.jobs
 	}
 	var visible []storage.ReviewJob
@@ -126,7 +127,7 @@ func (m model) queueHelpRows() [][]helpItem {
 	if !m.lockedRepoFilter || !m.lockedBranchFilter {
 		row2 = append(row2, helpItem{"f", "filter"})
 	}
-	row2 = append(row2, helpItem{"h", "hide"})
+	row2 = append(row2, helpItem{"h", "hide"}, helpItem{"H", "verdict"})
 	if m.shouldShowClassifyJobs() {
 		row2 = append(row2, helpItem{"s", "hide classify"})
 	} else {
@@ -209,7 +210,8 @@ func (m model) getVisibleSelectedIdx() int {
 	if m.selectedIdx < 0 {
 		return -1
 	}
-	if len(m.activeRepoFilter) == 0 && m.activeBranchFilter == "" && !m.hideClosed {
+	if len(m.activeRepoFilter) == 0 && m.activeBranchFilter == "" &&
+		m.activeVerdictFilter == "" && !m.hideClosed {
 		return m.selectedIdx
 	}
 	count := 0
@@ -375,6 +377,10 @@ func (m model) titleFilters() string {
 			if m.activeBranchFilter != "" {
 				fmt.Fprintf(&chips, " [b: %s]", m.activeBranchFilter)
 			}
+		case filterTypeVerdict:
+			if m.activeVerdictFilter != "" {
+				fmt.Fprintf(&chips, " [H: %s]", strings.ToUpper(m.activeVerdictFilter))
+			}
 		}
 	}
 	if chips.Len() == 0 {
@@ -523,7 +529,8 @@ func (m model) renderQueueView() string {
 		if m.loadingJobs || m.loadingMore {
 			b.WriteString("Loading...")
 			b.WriteString("\x1b[K\n")
-		} else if len(m.activeRepoFilter) > 0 || m.hideClosed {
+		} else if len(m.activeRepoFilter) > 0 || m.activeBranchFilter != "" ||
+			m.activeVerdictFilter != "" || m.hideClosed {
 			b.WriteString("No jobs matching filters")
 			b.WriteString("\x1b[K\n")
 		} else {
