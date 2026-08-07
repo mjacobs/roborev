@@ -1464,6 +1464,7 @@ func (c *Client) ListJobs(ctx context.Context, options *ListJobsRequestOptions, 
 		"panel_run":            {Style: "form", Explode: &[]bool{false}[0]},
 		"repo_prefix":          {Style: "form", Explode: &[]bool{false}[0]},
 		"status":               {Style: "form", Explode: &[]bool{false}[0]},
+		"verdict":              {Style: "form", Explode: &[]bool{false}[0]},
 	}
 	reqParams := runtime.RequestOptionsParameters{
 		RequestURL:    c.apiClient.GetBaseURL() + "/api/jobs",

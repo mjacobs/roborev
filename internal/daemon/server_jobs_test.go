@@ -206,6 +206,49 @@ func TestHandleListJobsClosedFilter(t *testing.T) {
 	})
 }
 
+func TestHandleListJobsVerdictFilter(t *testing.T) {
+	server, db, _ := newTestServer(t)
+	repo, err := db.GetOrCreateRepo("/test/verdict-filter")
+	require.NoError(t, err)
+
+	var openFailID int64
+	for i, verdict := range []int{1, 0, 0} {
+		job, enqueueErr := db.EnqueueJob(storage.EnqueueOpts{
+			RepoID: repo.ID, GitRef: fmt.Sprintf("verdict-%d", i), Agent: "test",
+		})
+		require.NoError(t, enqueueErr)
+		claimed, claimErr := db.ClaimJob("verdict-worker")
+		require.NoError(t, claimErr)
+		require.Equal(t, job.ID, claimed.ID)
+		require.NoError(t, db.CompleteJob(job.ID, "test", "prompt", "result"))
+		_, err = db.Exec(`UPDATE reviews SET verdict_bool = ? WHERE job_id = ?`, verdict, job.ID)
+		require.NoError(t, err)
+		if i == 1 {
+			openFailID = job.ID
+		}
+		if i == 2 {
+			require.NoError(t, db.MarkReviewClosedByJobID(job.ID, true))
+		}
+	}
+
+	failing := fetchJobs(t, server, "verdict=fail")
+	assert.Len(t, failing.Jobs, 2)
+	assert.Equal(t, storage.JobStats{Done: 2, Closed: 1, Open: 1}, failing.Stats)
+
+	openFailing := fetchJobs(t, server, "verdict=fail&closed=false")
+	require.Len(t, openFailing.Jobs, 1)
+	assert.Equal(t, openFailID, openFailing.Jobs[0].ID)
+	assert.Equal(t, storage.JobStats{Done: 2, Closed: 1, Open: 1}, openFailing.Stats)
+
+	passing := fetchJobs(t, server, "verdict=pass")
+	assert.Len(t, passing.Jobs, 1)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/jobs?verdict=maybe", nil)
+	w := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+}
+
 func TestHandleEnqueueExcludedBranch(t *testing.T) {
 	server, db, tmpDir := newTestServer(t)
 

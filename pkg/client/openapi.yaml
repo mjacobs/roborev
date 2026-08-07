@@ -3090,6 +3090,17 @@ paths:
               - "false"
               - ""
             type: string
+        - description: Filter by review verdict
+          explode: false
+          in: query
+          name: verdict
+          schema:
+            description: Filter by review verdict
+            enum:
+              - pass
+              - fail
+              - ""
+            type: string
         - description: Filter by job type
           explode: false
           in: query

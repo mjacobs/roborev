@@ -96,6 +96,7 @@ type ListJobsInput struct {
 	Branch             string   `query:"branch" doc:"Filter by branch name"`
 	BranchIncludeEmpty string   `query:"branch_include_empty" doc:"Include jobs with no branch when filtering by branch" enum:"true,false,"`
 	Closed             string   `query:"closed" doc:"Filter by review closed state" enum:"true,false,"`
+	Verdict            string   `query:"verdict" doc:"Filter by review verdict" enum:"pass,fail,"`
 	JobType            string   `query:"job_type" doc:"Filter by job type"`
 	ExcludeJobType     string   `query:"exclude_job_type" doc:"Exclude jobs of this type"`
 	HideClassifyJobs   string   `query:"hide_classify_jobs" doc:"Hide auto-design-router rows (job_type=classify and status=skipped)" enum:"true,false,"`
