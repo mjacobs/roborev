@@ -476,6 +476,62 @@ func TestListJobsWithBranchAndClosedFilters(t *testing.T) {
 	})
 }
 
+func TestListJobsVerdictFilter(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	repo, err := db.GetOrCreateRepo("/tmp/verdict-filter")
+	require.NoError(t, err)
+
+	var passID, openFailID, closedFailID int64
+	for i, pass := range []bool{true, false, false} {
+		sha := fmt.Sprintf("verdict-filter-%d", i)
+		commit := createCommit(t, db, repo.ID, sha)
+		job := enqueueJob(t, db, repo.ID, commit.ID, sha)
+		claimed, claimErr := db.ClaimJob("verdict-filter-worker")
+		require.NoError(t, claimErr)
+		require.Equal(t, job.ID, claimed.ID)
+		require.NoError(t, db.CompleteJob(job.ID, "test", "prompt", "result"))
+		verdict := 0
+		if pass {
+			verdict = 1
+		}
+		_, err = db.Exec(`UPDATE reviews SET verdict_bool = ? WHERE job_id = ?`, verdict, job.ID)
+		require.NoError(t, err)
+		switch i {
+		case 0:
+			passID = job.ID
+		case 1:
+			openFailID = job.ID
+		case 2:
+			closedFailID = job.ID
+			require.NoError(t, db.MarkReviewClosedByJobID(job.ID, true))
+		}
+	}
+
+	queuedCommit := createCommit(t, db, repo.ID, "verdict-filter-queued")
+	enqueueJob(t, db, repo.ID, queuedCommit.ID, "verdict-filter-queued")
+
+	passing, err := db.ListJobs("", "", 50, 0, WithVerdict(true))
+	require.NoError(t, err)
+	require.Len(t, passing, 1)
+	assert.Equal(t, passID, passing[0].ID)
+
+	failing, err := db.ListJobs("", "", 50, 0, WithVerdict(false))
+	require.NoError(t, err)
+	require.Len(t, failing, 2)
+	assert.ElementsMatch(t, []int64{openFailID, closedFailID}, []int64{failing[0].ID, failing[1].ID})
+
+	openFailing, err := db.ListJobs("", "", 50, 0, WithVerdict(false), WithClosed(false))
+	require.NoError(t, err)
+	require.Len(t, openFailing, 1)
+	assert.Equal(t, openFailID, openFailing[0].ID)
+
+	stats, err := db.CountJobStats("", WithVerdict(false))
+	require.NoError(t, err)
+	assert.Equal(t, JobStats{Done: 2, Closed: 1, Open: 1}, stats)
+}
+
 func TestWithBranchOrEmpty(t *testing.T) {
 	db := openTestDB(t)
 	defer db.Close()
