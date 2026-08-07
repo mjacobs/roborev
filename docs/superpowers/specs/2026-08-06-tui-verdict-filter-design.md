@@ -50,8 +50,10 @@ entry from the stack.
 
 ## Data Flow
 
-Verdict filtering happens server-side so pagination and queue counts describe
-the same result set shown on screen.
+Verdict filtering happens server-side so pagination and queue counts use the
+same verdict scope as the rows shown on screen. As in the existing TUI, queue
+header counts ignore the hide-closed toggle: within the selected verdict, they
+continue to show completed, closed, and open totals while `h` narrows the rows.
 
 The TUI sends a verdict query value with initial and paginated job requests.
 The daemon validates the supported values and passes the selection into the
