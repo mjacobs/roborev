@@ -570,6 +570,53 @@ func TestHelpLinesShowDisabledTasksShortcuts(t *testing.T) {
 	assert.NotContains(t, stripTestANSI(enabled), "(disabled)")
 }
 
+func TestVerdictFilterRendersAcrossQueueHelpSurfaces(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+	m.height = 200
+
+	assert.Contains(t, stripTestANSI(m.renderQueueTitle()), "[H: FAIL]")
+	assert.Contains(t, stripTestANSI(m.renderHelpView()), "H")
+	assert.Contains(t, stripTestANSI(m.renderHelpView()), "Cycle verdict all/fail/pass")
+
+	foundFooterShortcut := false
+	for _, row := range m.queueHelpRows() {
+		for _, item := range row {
+			if item.key == "H" {
+				foundFooterShortcut = true
+			}
+		}
+	}
+	assert.True(t, foundFooterShortcut)
+}
+
+func TestVerdictFilterHidesMismatchedJobsBeforeRefetch(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.jobs = []storage.ReviewJob{
+		makeJob(1, withVerdict("F")),
+		makeJob(2, withVerdict("P")),
+		makeJob(3),
+	}
+
+	visible := m.getVisibleJobs()
+	require.Len(t, visible, 1)
+	assert.EqualValues(t, 1, visible[0].ID)
+}
+
+func TestVerdictFilterExcludesMismatchedSelection(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.jobs = []storage.ReviewJob{
+		makeJob(1, withVerdict("F")),
+		makeJob(2, withVerdict("P")),
+	}
+	m.selectedIdx = 1
+
+	assert.Equal(t, -1, m.getVisibleSelectedIdx())
+}
+
 func TestSanitizeForDisplay(t *testing.T) {
 	tests := []struct {
 		name     string

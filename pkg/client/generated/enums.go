@@ -64,6 +64,25 @@ func (l ListJobsQueryClosed) Validate() error {
 	}
 }
 
+// ListJobsQueryVerdict Filter by review verdict
+type ListJobsQueryVerdict string
+
+const (
+	Fail                      ListJobsQueryVerdict = "fail"
+	ListJobsQueryVerdictEmpty ListJobsQueryVerdict = ""
+	Pass                      ListJobsQueryVerdict = "pass"
+)
+
+// Validate checks if the ListJobsQueryVerdict value is valid
+func (l ListJobsQueryVerdict) Validate() error {
+	switch l {
+	case Fail, ListJobsQueryVerdictEmpty, Pass:
+		return nil
+	default:
+		return runtime.NewValidationErrorsFromString("Enum", fmt.Sprintf("must be a valid ListJobsQueryVerdict value, got: %v", l))
+	}
+}
+
 // ListJobsQueryHideClassifyJobs Hide auto-design-router rows (job_type=classify and status=skipped)
 type ListJobsQueryHideClassifyJobs string
 

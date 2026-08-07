@@ -47,6 +47,7 @@ type stateSnapshot struct {
 	View            string           `json:"view"`
 	RepoFilter      []string         `json:"repo_filter"`
 	BranchFilter    string           `json:"branch_filter"`
+	VerdictFilter   string           `json:"verdict_filter"`
 	LockedRepo      bool             `json:"locked_repo"`
 	LockedBranch    bool             `json:"locked_branch"`
 	HideClosed      bool             `json:"hide_closed"`

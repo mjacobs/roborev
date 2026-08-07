@@ -167,6 +167,12 @@ func (m model) handleRerunKey() (tea.Model, tea.Cmd) {
 		job.Error = ""
 		job.Closed = nil
 		job.Verdict = nil
+		if m.selectedJobID == job.ID && !m.isJobVisible(*job) {
+			m.normalizeSelectionIfHidden()
+			snap.restoreSelection = true
+			snap.fallbackSelection = m.selectedJobID
+			snap.queueStateGen = m.queueStateGen
+		}
 		return m, m.rerunJob(snap)
 	}
 	return m, nil

@@ -99,12 +99,6 @@ type FailureStats struct {
 	Errors  map[string]int `json:"errors"`
 }
 
-// verdictJobFilter excludes job types whose verdict_bool values are meaningless.
-// Task jobs produce freeform analysis and fix jobs produce code edits — neither
-// returns PASS/FAIL output, so ParseVerdict results are not meaningful.
-// NOTE: assumes review_jobs is aliased as "j" in the enclosing query.
-const verdictJobFilter = "COALESCE(j.job_type, 'review') NOT IN ('task', 'fix')"
-
 // SummaryOptions configures the summary query.
 type SummaryOptions struct {
 	RepoPath string

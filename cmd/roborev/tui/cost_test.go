@@ -1,9 +1,13 @@
 package tui
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.kenn.io/roborev/internal/storage"
 )
@@ -77,4 +81,29 @@ func TestCostSegmentHiddenAfterFilterChange(t *testing.T) {
 	text, show = m.costSegmentText()
 	assert.True(show)
 	assert.Equal("~$0.75", text)
+}
+
+func TestVerdictFilteredHeaderOmitsUnscopedCost(t *testing.T) {
+	var costRequests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		costRequests.Add(1)
+		http.Error(w, "unexpected cost request", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	m := newModel(testEndpointFromURL(server.URL), withExternalIODisabled())
+	m.width = 200
+	m.activeVerdictFilter = verdictFilterFail
+	m.jobStats = storage.JobStats{Done: 1, Open: 1}
+
+	msg, ok := m.fetchCost()().(costMsg)
+	require.True(t, ok)
+	updated, _ := m.handleCostMsg(msg)
+	m = updated.(model)
+	assert.Zero(t, costRequests.Load(), "verdict-filtered cost fetch must not call the unscoped endpoint")
+
+	header := m.renderQueueStatusLine(m.jobStats.Done, m.jobStats.Closed, m.jobStats.Open)
+	assert.Contains(t, header, "Completed: 1")
+	assert.NotContains(t, header, "~$",
+		"verdict-scoped counts must not be paired with an unscoped cost")
 }

@@ -1024,6 +1024,7 @@ type listJobsOptions struct {
 	branch             string
 	branchIncludeEmpty bool
 	closed             *bool
+	verdict            *bool
 	jobType            string
 	excludeJobType     string
 	hideClassifyJobs   bool
@@ -1057,6 +1058,11 @@ func WithBranchOrEmpty(branch string) ListJobsOption {
 // WithClosed filters jobs by closed state (true/false).
 func WithClosed(closed bool) ListJobsOption {
 	return func(o *listJobsOptions) { o.closed = &closed }
+}
+
+// WithVerdict filters jobs by persisted review verdict.
+func WithVerdict(pass bool) ListJobsOption {
+	return func(o *listJobsOptions) { o.verdict = &pass }
 }
 
 // WithoutPrompt selects an empty string in place of the prompt column for
@@ -1184,6 +1190,15 @@ func buildJobFilterClause(statusFilter, repoFilter string, o listJobsOptions) (s
 			conditions = append(conditions, "rv.closed = 1")
 		} else {
 			conditions = append(conditions, "(rv.closed IS NULL OR rv.closed = 0)")
+		}
+	}
+	if o.verdict != nil {
+		conditions = append(conditions, verdictJobFilter)
+		conditions = append(conditions, "rv.verdict_bool = ?")
+		if *o.verdict {
+			args = append(args, 1)
+		} else {
+			args = append(args, 0)
 		}
 	}
 	if o.jobType != "" {

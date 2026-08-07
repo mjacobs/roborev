@@ -30,6 +30,41 @@ func TestTUIFilterClearWithEsc(t *testing.T) {
 	assert.Equal(t, -1, m2.selectedIdx)
 }
 
+func TestTUIVerdictFilterCycles(t *testing.T) {
+	m := newModel(localhostEndpoint, withExternalIODisabled())
+	m.currentView = viewQueue
+
+	failing, failCmd := pressKey(m, 'H')
+	assert.Equal(t, verdictFilterFail, failing.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, failing.filterStack)
+	assert.NotNil(t, failCmd)
+
+	passing, passCmd := pressKey(failing, 'H')
+	assert.Equal(t, verdictFilterPass, passing.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, passing.filterStack)
+	assert.NotNil(t, passCmd)
+
+	all, allCmd := pressKey(passing, 'H')
+	assert.Empty(t, all.activeVerdictFilter)
+	assert.Empty(t, all.filterStack)
+	assert.NotNil(t, allCmd)
+}
+
+func TestTUIVerdictFilterEscapesBeforeHideClosed(t *testing.T) {
+	m := newModel(localhostEndpoint, withExternalIODisabled())
+	m.currentView = viewQueue
+	m.hideClosed = true
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+
+	withoutVerdict, _ := pressSpecial(m, tea.KeyEscape)
+	assert.Empty(t, withoutVerdict.activeVerdictFilter)
+	assert.True(t, withoutVerdict.hideClosed)
+
+	withoutHideClosed, _ := pressSpecial(withoutVerdict, tea.KeyEscape)
+	assert.False(t, withoutHideClosed.hideClosed)
+}
+
 func TestTUIFilterClearWithEscLayered(t *testing.T) {
 	m := newModel(localhostEndpoint, withExternalIODisabled())
 

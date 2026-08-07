@@ -12,6 +12,12 @@ const (
 	verdictFail = "F"
 )
 
+// verdictJobFilter excludes job types whose verdict_bool values are
+// meaningless. Task and insights jobs produce freeform analysis, while fix
+// jobs produce code edits; none returns PASS/FAIL review output.
+// NOTE: assumes review_jobs is aliased as "j" in the enclosing query.
+const verdictJobFilter = "COALESCE(j.job_type, 'review') NOT IN ('task', 'insights', 'fix')"
+
 // verdictToBool converts a ParseVerdict result ("P"/"F") to an integer
 // for storage in the verdict_bool column (1=pass, 0=fail).
 func verdictToBool(verdict string) int {

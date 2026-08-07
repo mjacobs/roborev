@@ -60,6 +60,7 @@ branch.
 | `f` | Open filter (repo/branch tree) |
 | `b` | Open filter with branches expanded |
 | `h` | Toggle hide closed/failed/canceled |
+| `H` | Cycle verdict filter (all, failing, passing) |
 | `D` | Toggle distraction-free mode |
 | `P` | Pause or resume queue processing |
 | `g` | Jump to top of queue |
@@ -158,8 +159,15 @@ details.
 Pressing `h` toggles the hide-closed filter for the current session without
 changing the config.
 
-`Esc` clears filters one layer at a time in the order they were applied. Press
-`h` again to toggle hide-closed off directly.
+Press `H` once for failing verdicts, twice for passing verdicts, and a third
+time to show every verdict. Combine `H` on its failing state with `h` to show
+only open failing reviews. When active, the queue title shows `[H: FAIL]` or
+`[H: PASS]` so the verdict scope remains visible.
+
+`Esc` clears stacked repo, branch, and verdict filters one layer at a time, with
+the most recently applied filter cleared first. Hide-closed stays outside that
+stack: after all stacked filters are gone, a further `Esc` disables hide-closed,
+regardless of when you pressed `h`. Press `h` again to disable it directly.
 
 ## Distraction-Free Mode
 
@@ -420,8 +428,8 @@ read this file to discover running TUI instances.
 
 | Command | Description |
 |---------|-------------|
-| `get-state` | Current view, filters, hide-closed state, selected job ID, job counts |
-| `get-filter` | Active repo and branch filters with lock status |
+| `get-state` | Current view, repo/branch/verdict filters, hide-closed state, selected job ID, job counts |
+| `get-filter` | Active repo, branch, and verdict filters with lock status |
 | `get-jobs` | List of visible jobs (ID, agent, status, repo, branch, verdict) |
 | `get-selected` | Currently selected job and whether it has a review |
 
@@ -429,8 +437,8 @@ read this file to discover running TUI instances.
 
 | Command | Description |
 |---------|-------------|
-| `set-filter` | Set repo and/or branch filter (resolves display names to paths) |
-| `clear-filter` | Clear active filters |
+| `set-filter` | Set repo, branch, and/or verdict filter (resolves display names to paths; verdict is `fail` or `pass`) |
+| `clear-filter` | Clear specified active filters, including the verdict filter |
 | `set-hide-closed` | Toggle hide-closed state |
 | `select-job` | Select a job by ID (rejects jobs hidden by filters) |
 | `set-view` | Switch between `queue` and `tasks` views |
@@ -446,6 +454,8 @@ Send a request as a single JSON line:
 ```json
 {"command": "get-state"}
 {"command": "set-filter", "params": {"repo": "myrepo", "branch": "main"}}
+{"command": "set-filter", "params": {"verdict": "fail"}}
+{"command": "clear-filter", "params": {"verdict": true}}
 {"command": "close-review", "params": {"job_id": 42}}
 ```
 
@@ -455,6 +465,10 @@ Responses include an `ok` field, optional `error`, and optional `data`:
 {"ok": true, "data": {"view": "queue", "job_count": 15, ...}}
 {"ok": false, "error": "job not found"}
 ```
+
+`get-state` and `get-filter` report the active verdict as `verdict_filter`. Use
+`set-filter` with `{"verdict":"fail"}` or `{"verdict":"pass"}` to set it. Use an
+empty verdict value or `clear-filter` with `{"verdict":true}` to clear it.
 
 ### Example
 
@@ -467,6 +481,10 @@ echo '{"command":"get-state"}' | nc -U "$SOCKET"
 
 # Set filter to a specific repo
 echo '{"command":"set-filter","params":{"repo":"myproject"}}' | nc -U "$SOCKET"
+
+# Show only failing reviews, then clear that verdict filter
+echo '{"command":"set-filter","params":{"verdict":"fail"}}' | nc -U "$SOCKET"
+echo '{"command":"clear-filter","params":{"verdict":true}}' | nc -U "$SOCKET"
 ```
 
 ### Security

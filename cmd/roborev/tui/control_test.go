@@ -88,6 +88,7 @@ func TestBuildStateResponse(t *testing.T) {
 	}
 	m.selectedJobID = 1
 	m.hideClosed = true
+	m.activeVerdictFilter = verdictFilterFail
 
 	resp := m.buildStateResponse()
 	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
@@ -97,17 +98,74 @@ func TestBuildStateResponse(t *testing.T) {
 	assert.Equal(t, "queue", data.View)
 	assert.Equal(t, 2, data.JobCount)
 	assert.True(t, data.HideClosed)
+	assert.Equal(t, verdictFilterFail, data.VerdictFilter)
 }
 
 func TestBuildFilterResponse(t *testing.T) {
 	m := newModel(testEndpoint, withExternalIODisabled())
 	m.activeRepoFilter = []string{"/repo"}
 	m.activeBranchFilter = "main"
+	m.activeVerdictFilter = verdictFilterPass
 	m.lockedRepoFilter = true
 	m.filterStack = []string{"repo", "branch"}
 
 	resp := m.buildFilterResponse()
 	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	encoded, err := json.Marshal(resp.Data)
+	require.NoError(t, err)
+	var data struct {
+		VerdictFilter string `json:"verdict_filter"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &data))
+	assert.Equal(t, verdictFilterPass, data.VerdictFilter)
+}
+
+func TestHandleCtrlSetFilterVerdict(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+
+	params, err := json.Marshal(map[string]string{"verdict": "fail"})
+	require.NoError(t, err)
+	updated, resp, _ := m.handleCtrlSetFilter(params)
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Equal(t, verdictFilterFail, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+
+	params, err = json.Marshal(map[string]string{"verdict": "pass"})
+	require.NoError(t, err)
+	updated, resp, _ = updated.handleCtrlSetFilter(params)
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Equal(t, verdictFilterPass, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+}
+
+func TestHandleCtrlSetFilterRejectsInvalidVerdictWithoutMutation(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+
+	params, err := json.Marshal(map[string]string{"verdict": "unknown"})
+	require.NoError(t, err)
+	updated, resp, cmd := m.handleCtrlSetFilter(params)
+
+	require.False(t, resp.OK)
+	assert.Equal(t, "verdict filter must be fail or pass", resp.Error)
+	assert.Equal(t, verdictFilterFail, updated.activeVerdictFilter)
+	assert.Equal(t, []string{filterTypeVerdict}, updated.filterStack)
+	assert.Nil(t, cmd)
+}
+
+func TestHandleCtrlClearFilterVerdict(t *testing.T) {
+	m := newModel(testEndpoint, withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.filterStack = []string{filterTypeVerdict}
+
+	params, err := json.Marshal(map[string]bool{"verdict": true})
+	require.NoError(t, err)
+	updated, resp, _ := m.handleCtrlClearFilter(params)
+
+	require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+	assert.Empty(t, updated.activeVerdictFilter)
+	assert.Empty(t, updated.filterStack)
 }
 
 func TestBuildJobsResponse(t *testing.T) {
@@ -815,6 +873,135 @@ func TestHandleRerunKey_ClearsClosedAndVerdict(t *testing.T) {
 		"Verdict should be cleared on rerun")
 	assert.True(t, updated.isJobVisible(updated.jobs[0]),
 		"rerun job should be visible with hideClosed")
+}
+
+func TestRerunVerdictFilterMovesAndRestoresSelectionOnFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/job/rerun", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	for _, tt := range []struct {
+		name       string
+		useControl bool
+	}{
+		{name: "keyboard"},
+		{name: "control", useControl: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel(testEndpointFromURL(server.URL), withExternalIODisabled())
+			m.currentView = viewQueue
+			m.activeVerdictFilter = verdictFilterFail
+			m.jobs = []storage.ReviewJob{
+				makeJob(10, withVerdict("F")),
+				makeJob(20, withVerdict("F")),
+			}
+			m.selectedIdx = 0
+			m.selectedJobID = 10
+
+			var updated model
+			var cmd tea.Cmd
+			if tt.useControl {
+				params, err := json.Marshal(map[string]int64{"job_id": 10})
+				require.NoError(t, err)
+				var resp controlResponse
+				updated, resp, cmd = m.handleCtrlRerunJob(params)
+				require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+			} else {
+				result, rerunCmd := m.handleRerunKey()
+				updated = result.(model)
+				cmd = rerunCmd
+			}
+
+			assert.EqualValues(t, 20, updated.selectedJobID)
+			assert.Equal(t, 1, updated.selectedIdx)
+			assert.False(t, updated.isJobVisible(updated.jobs[0]))
+
+			msg := cmd()
+			rerunResult, ok := msg.(rerunResultMsg)
+			require.True(t, ok, "expected rerunResultMsg, got %T", msg)
+			require.Error(t, rerunResult.err)
+
+			result, _ := updated.handleRerunResultMsg(rerunResult)
+			restored := result.(model)
+			assert.EqualValues(t, 10, restored.selectedJobID)
+			assert.Equal(t, 0, restored.selectedIdx)
+			assert.True(t, restored.isJobVisible(restored.jobs[0]))
+		})
+	}
+}
+
+func TestRerunVerdictFilterFailurePreservesSelectionAfterMovingAwayAndBack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	m := newModel(testEndpointFromURL(server.URL), withExternalIODisabled())
+	m.currentView = viewQueue
+	m.activeVerdictFilter = verdictFilterFail
+	m.jobs = []storage.ReviewJob{
+		makeJob(10, withVerdict("F")),
+		makeJob(20, withVerdict("F")),
+		makeJob(30, withVerdict("F")),
+	}
+	m.selectedIdx = 0
+	m.selectedJobID = 10
+
+	result, cmd := m.handleRerunKey()
+	updated := result.(model)
+	require.EqualValues(t, 20, updated.selectedJobID)
+
+	result, _ = updated.handleDownKey()
+	updated = result.(model)
+	require.EqualValues(t, 30, updated.selectedJobID)
+	result, _ = updated.handleUpKey()
+	updated = result.(model)
+	require.EqualValues(t, 20, updated.selectedJobID)
+
+	msg := cmd()
+	rerunResult, ok := msg.(rerunResultMsg)
+	require.True(t, ok, "expected rerunResultMsg, got %T", msg)
+	require.Error(t, rerunResult.err)
+
+	result, _ = updated.handleRerunResultMsg(rerunResult)
+	restored := result.(model)
+	assert.EqualValues(t, 20, restored.selectedJobID,
+		"a late rerun failure must not replace a selection the user revisited")
+}
+
+func TestRerunVerdictFilterClearsSelectionWithoutVisibleNeighbor(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		useControl bool
+	}{
+		{name: "keyboard"},
+		{name: "control", useControl: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel(testEndpoint, withExternalIODisabled())
+			m.currentView = viewQueue
+			m.activeVerdictFilter = verdictFilterFail
+			m.jobs = []storage.ReviewJob{makeJob(10, withVerdict("F"))}
+			m.selectedIdx = 0
+			m.selectedJobID = 10
+
+			if tt.useControl {
+				params, err := json.Marshal(map[string]int64{"job_id": 10})
+				require.NoError(t, err)
+				updated, resp, _ := m.handleCtrlRerunJob(params)
+				require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+				m = updated
+			} else {
+				result, _ := m.handleRerunKey()
+				m = result.(model)
+			}
+
+			assert.Equal(t, -1, m.selectedIdx)
+			assert.Zero(t, m.selectedJobID)
+		})
+	}
 }
 
 func TestRerunResultMsg_RestoresClosedOnFailure(t *testing.T) {

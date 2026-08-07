@@ -161,6 +161,10 @@ func listJobsQuery(values neturl.Values) *daemonclient.ListJobsQuery {
 		typed := daemonclient.ListJobsQueryClosed(value)
 		query.Closed = &typed
 	}
+	if value := values.Get("verdict"); value != "" {
+		typed := daemonclient.ListJobsQueryVerdict(value)
+		query.Verdict = &typed
+	}
 	setStringParam("job_type", &query.JobType)
 	setStringParam("exclude_job_type", &query.ExcludeJobType)
 	if value := values.Get("hide_classify_jobs"); value != "" {
@@ -215,6 +219,9 @@ func (m model) fetchJobs() tea.Cmd {
 		// all jobs for accurate client-side metrics counting.
 		if m.hideClosed && !needsAllJobs {
 			params.Set("closed", "false")
+		}
+		if m.activeVerdictFilter != "" {
+			params.Set("verdict", m.activeVerdictFilter)
 		}
 
 		// Exclude fix jobs — they belong in the Tasks view, not the queue
@@ -279,6 +286,9 @@ func (m model) fetchMoreJobs() tea.Cmd {
 		if m.hideClosed {
 			params.Set("closed", "false")
 		}
+		if m.activeVerdictFilter != "" {
+			params.Set("verdict", m.activeVerdictFilter)
+		}
 		params.Set("exclude_job_type", "fix")
 		if !m.shouldShowClassifyJobs() {
 			params.Set("hide_classify_jobs", "true")
@@ -301,6 +311,9 @@ func (m model) fetchMoreJobs() tea.Cmd {
 // or bogus data.
 func (m model) fetchCost() tea.Cmd {
 	seq := m.fetchSeq
+	if m.activeVerdictFilter != "" {
+		return func() tea.Msg { return costMsg{cost: nil, seq: seq} }
+	}
 	var query daemonclient.GetCostQuery
 	if len(m.activeRepoFilter) > 0 {
 		query.Repo = append([]string(nil), m.activeRepoFilter...)

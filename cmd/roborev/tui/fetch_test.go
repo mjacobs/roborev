@@ -37,6 +37,45 @@ func TestListJobsParamsNoRepo(t *testing.T) {
 	assert.Nil(t, query.Repo, "absent repo means no filter")
 }
 
+func TestListJobsQueryVerdict(t *testing.T) {
+	query := listJobsQuery(neturl.Values{"verdict": {"fail"}})
+
+	require.NotNil(t, query.Verdict)
+	assert.Equal(t, "fail", string(*query.Verdict))
+}
+
+func TestFetchJobsAndMoreSendVerdictAndClosedFilters(t *testing.T) {
+	var jobsQuery, moreQuery neturl.Values
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/jobs" {
+			if r.URL.Query().Get("offset") == "" {
+				jobsQuery = r.URL.Query()
+			} else {
+				moreQuery = r.URL.Query()
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"jobs": []any{}, "has_more": false})
+	}))
+	defer ts.Close()
+
+	m := newModel(testEndpointFromURL(ts.URL), withExternalIODisabled())
+	m.activeVerdictFilter = verdictFilterFail
+	m.hideClosed = true
+
+	_, ok := fetchJobsMessage(t, m).(jobsMsg)
+	require.True(t, ok)
+	m.jobs = []storage.ReviewJob{{ID: 1}}
+	m.fetchMoreJobs()()
+
+	require.NotNil(t, jobsQuery)
+	require.NotNil(t, moreQuery)
+	assert.Equal(t, "fail", jobsQuery.Get("verdict"))
+	assert.Equal(t, "false", jobsQuery.Get("closed"))
+	assert.Equal(t, "fail", moreQuery.Get("verdict"))
+	assert.Equal(t, "false", moreQuery.Get("closed"))
+}
+
 // A display name spanning multiple repos must scope the jobs query
 // server-side (one ?repo= per path) and keep pagination, rather than
 // falling back to limit=0 and loading every job — the regression that

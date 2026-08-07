@@ -82,6 +82,7 @@ func (m model) buildStateResponse() controlResponse {
 			View:            m.currentView.String(),
 			RepoFilter:      copyStrings(m.activeRepoFilter),
 			BranchFilter:    m.activeBranchFilter,
+			VerdictFilter:   m.activeVerdictFilter,
 			LockedRepo:      m.lockedRepoFilter,
 			LockedBranch:    m.lockedBranchFilter,
 			HideClosed:      m.hideClosed,
@@ -95,20 +96,22 @@ func (m model) buildStateResponse() controlResponse {
 
 func (m model) buildFilterResponse() controlResponse {
 	type filterData struct {
-		RepoFilter   []string `json:"repo_filter"`
-		BranchFilter string   `json:"branch_filter"`
-		LockedRepo   bool     `json:"locked_repo"`
-		LockedBranch bool     `json:"locked_branch"`
-		FilterStack  []string `json:"filter_stack"`
+		RepoFilter    []string `json:"repo_filter"`
+		BranchFilter  string   `json:"branch_filter"`
+		VerdictFilter string   `json:"verdict_filter"`
+		LockedRepo    bool     `json:"locked_repo"`
+		LockedBranch  bool     `json:"locked_branch"`
+		FilterStack   []string `json:"filter_stack"`
 	}
 	return controlResponse{
 		OK: true,
 		Data: filterData{
-			RepoFilter:   copyStrings(m.activeRepoFilter),
-			BranchFilter: m.activeBranchFilter,
-			LockedRepo:   m.lockedRepoFilter,
-			LockedBranch: m.lockedBranchFilter,
-			FilterStack:  copyStrings(m.filterStack),
+			RepoFilter:    copyStrings(m.activeRepoFilter),
+			BranchFilter:  m.activeBranchFilter,
+			VerdictFilter: m.activeVerdictFilter,
+			LockedRepo:    m.lockedRepoFilter,
+			LockedBranch:  m.lockedBranchFilter,
+			FilterStack:   copyStrings(m.filterStack),
 		},
 	}
 }
@@ -207,8 +210,9 @@ func (m model) handleCtrlSetFilter(
 	raw json.RawMessage,
 ) (model, controlResponse, tea.Cmd) {
 	var params struct {
-		Repo   *string `json:"repo"`
-		Branch *string `json:"branch"`
+		Repo    *string `json:"repo"`
+		Branch  *string `json:"branch"`
+		Verdict *string `json:"verdict"`
 	}
 	if err := json.Unmarshal(raw, &params); err != nil {
 		return m, controlResponse{
@@ -227,6 +231,11 @@ func (m model) handleCtrlSetFilter(
 		return m, controlResponse{
 			Error: "branch filter is locked via --branch flag",
 		}, nil
+	}
+	if params.Verdict != nil && *params.Verdict != "" &&
+		*params.Verdict != verdictFilterFail &&
+		*params.Verdict != verdictFilterPass {
+		return m, controlResponse{Error: "verdict filter must be fail or pass"}, nil
 	}
 
 	if params.Repo != nil {
@@ -249,6 +258,15 @@ func (m model) handleCtrlSetFilter(
 		}
 	}
 
+	if params.Verdict != nil {
+		m.activeVerdictFilter = *params.Verdict
+		if *params.Verdict == "" {
+			m.removeFilterFromStack(filterTypeVerdict)
+		} else {
+			m.pushFilter(filterTypeVerdict)
+		}
+	}
+
 	m.resetQueueForFilterChange()
 	m.recomputeClassifyEffective()
 	return m, controlResponse{OK: true}, m.fetchJobs()
@@ -258,8 +276,9 @@ func (m model) handleCtrlClearFilter(
 	raw json.RawMessage,
 ) (model, controlResponse, tea.Cmd) {
 	var params struct {
-		Repo   bool `json:"repo"`
-		Branch bool `json:"branch"`
+		Repo    bool `json:"repo"`
+		Branch  bool `json:"branch"`
+		Verdict bool `json:"verdict"`
 	}
 	if err := json.Unmarshal(raw, &params); err != nil {
 		return m, controlResponse{
@@ -288,6 +307,11 @@ func (m model) handleCtrlClearFilter(
 	if params.Branch {
 		m.activeBranchFilter = ""
 		m.removeFilterFromStack(filterTypeBranch)
+	}
+
+	if params.Verdict {
+		m.activeVerdictFilter = ""
+		m.removeFilterFromStack(filterTypeVerdict)
 	}
 
 	m.resetQueueForFilterChange()
@@ -337,8 +361,7 @@ func (m model) handleCtrlSelectJob(
 					),
 				}, nil
 			}
-			m.selectedIdx = i
-			m.selectedJobID = params.JobID
+			m = m.moveSelectionToJobID(params.JobID)
 			return m, controlResponse{OK: true}, nil
 		}
 	}
@@ -599,6 +622,12 @@ func (m model) handleCtrlRerunJob(
 	// the local optimistic state consistent until the next fetch.
 	job.Closed = nil
 	job.Verdict = nil
+	if m.selectedJobID == job.ID && !m.isJobVisible(*job) {
+		m.normalizeSelectionIfHidden()
+		snap.restoreSelection = true
+		snap.fallbackSelection = m.selectedJobID
+		snap.queueStateGen = m.queueStateGen
+	}
 
 	return m, controlResponse{OK: true}, m.rerunJob(snap)
 }

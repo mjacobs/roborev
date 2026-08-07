@@ -1108,6 +1108,12 @@ func (s *Server) humaListJobs(
 			storage.WithClosed(input.Closed == "true"),
 		)
 	}
+	switch input.Verdict {
+	case "pass":
+		listOpts = append(listOpts, storage.WithVerdict(true))
+	case "fail":
+		listOpts = append(listOpts, storage.WithVerdict(false))
+	}
 	if input.JobType != "" {
 		listOpts = append(
 			listOpts, storage.WithJobType(input.JobType),
@@ -1186,6 +1192,12 @@ func (s *Server) humaListJobs(
 				storage.WithBranch(input.Branch),
 			)
 		}
+	}
+	switch input.Verdict {
+	case "pass":
+		statsOpts = append(statsOpts, storage.WithVerdict(true))
+	case "fail":
+		statsOpts = append(statsOpts, storage.WithVerdict(false))
 	}
 	if input.JobType != "" {
 		statsOpts = append(

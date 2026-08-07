@@ -168,6 +168,9 @@ type ListJobsQuery struct {
 	// Closed Filter by review closed state
 	Closed *ListJobsQueryClosed `json:"closed,omitempty"`
 
+	// Verdict Filter by review verdict
+	Verdict *ListJobsQueryVerdict `json:"verdict,omitempty"`
+
 	// JobType Filter by job type
 	JobType *string `json:"job_type,omitempty"`
 
@@ -209,6 +212,13 @@ func (l ListJobsQuery) Validate() error {
 		if v, ok := any(l.Closed).(runtime.Validator); ok {
 			if err := v.Validate(); err != nil {
 				errors = errors.Append("Closed", err)
+			}
+		}
+	}
+	if l.Verdict != nil {
+		if v, ok := any(l.Verdict).(runtime.Validator); ok {
+			if err := v.Validate(); err != nil {
+				errors = errors.Append("Verdict", err)
 			}
 		}
 	}

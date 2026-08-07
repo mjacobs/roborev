@@ -38,6 +38,9 @@ func (m *model) handleQueueMouseClick(_ int, y int) {
 // moveSelectionToJobID sets selectedJobID to id (authoritative) and resyncs
 // selectedIdx best-effort (the m.jobs index, or -1 for a panel member).
 func (m model) moveSelectionToJobID(id int64) model {
+	if m.selectedJobID != id {
+		m.queueStateGen++
+	}
 	m.selectedJobID = id
 	m.selectedIdx = -1
 	for i := range m.jobs {
@@ -411,6 +414,25 @@ func (m model) handleHideClosedKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.hideClosed = !m.hideClosed
+	m.resetQueueForFilterChange()
+	return m, m.fetchJobs()
+}
+
+func (m model) handleVerdictFilterKey() (tea.Model, tea.Cmd) {
+	if m.currentView != viewQueue {
+		return m, nil
+	}
+	switch m.activeVerdictFilter {
+	case "":
+		m.activeVerdictFilter = verdictFilterFail
+		m.pushFilter(filterTypeVerdict)
+	case verdictFilterFail:
+		m.activeVerdictFilter = verdictFilterPass
+		m.pushFilter(filterTypeVerdict)
+	default:
+		m.activeVerdictFilter = ""
+		m.removeFilterFromStack(filterTypeVerdict)
+	}
 	m.resetQueueForFilterChange()
 	return m, m.fetchJobs()
 }

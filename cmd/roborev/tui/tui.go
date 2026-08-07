@@ -269,6 +269,7 @@ type model struct {
 	status           storage.DaemonStatus
 	selectedIdx      int
 	selectedJobID    int64                          // Track selected job by ID to maintain position on refresh
+	queueStateGen    uint64                         // increments on user-visible queue selection/filter changes
 	expandedPanels   map[string]bool                // panel_run_uuid -> expanded
 	panelMembers     map[string][]storage.ReviewJob // panel_run_uuid -> side-fetched members
 	currentView      viewKind
@@ -317,11 +318,12 @@ type model struct {
 	commentFromView viewKind // View to return to after comment modal closes
 
 	// Active filter (applied to queue view)
-	activeRepoFilter   []string // Empty = show all, otherwise repo root_paths to filter by
-	autoRepoFilter     bool     // true when activeRepoFilter came from auto_filter_repo
-	activeBranchFilter string   // Empty = show all, otherwise branch name to filter by
-	filterStack        []string // Order of applied filters: "repo", "branch" - for escape to pop in order
-	hideClosed         bool     // When true, hide jobs with closed reviews
+	activeRepoFilter    []string // Empty = show all, otherwise repo root_paths to filter by
+	autoRepoFilter      bool     // true when activeRepoFilter came from auto_filter_repo
+	activeBranchFilter  string   // Empty = show all, otherwise branch name to filter by
+	activeVerdictFilter string   // Empty = show all, otherwise "fail" or "pass"
+	filterStack         []string // Order of applied filters, for escape to pop in order
+	hideClosed          bool     // When true, hide jobs with closed reviews
 	// globalCfg is cached at startup and consulted at fetch time so that
 	// show_classify_jobs can be resolved against whichever repo is the
 	// currently active single-repo filter (rather than baked in once

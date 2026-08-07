@@ -19,8 +19,12 @@ import (
 
 // Filter type constants used in filterStack and popFilter/pushFilter.
 const (
-	filterTypeRepo   = "repo"
-	filterTypeBranch = "branch"
+	filterTypeRepo    = "repo"
+	filterTypeBranch  = "branch"
+	filterTypeVerdict = "verdict"
+
+	verdictFilterFail = "fail"
+	verdictFilterPass = "pass"
 )
 
 // branchNone is the sentinel value for jobs with no branch information.

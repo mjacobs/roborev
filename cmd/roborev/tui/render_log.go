@@ -300,6 +300,7 @@ func helpLines(tasksEnabled, noQuit bool) []string {
 			keys: []struct{ key, desc string }{
 				{"f", "Filter by repository/branch"},
 				{"h", "Toggle hide closed/failed"},
+				{"H", "Cycle verdict all/fail/pass"},
 				{"s", "Toggle classify rows (auto-design router)"},
 				{"esc", "Clear filters (one at a time)"},
 			},
