@@ -7,6 +7,9 @@ All notable changes to roborev, grouped by minor release.
 
 ## Unreleased
 
+- TUI verdict filtering now cycles through failing, passing, and all reviews,
+    and composes with the existing hide-closed filter.
+
 ______________________________________________________________________
 
 ## 0.64.0
