@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,11 +84,10 @@ func TestCostSegmentHiddenAfterFilterChange(t *testing.T) {
 }
 
 func TestVerdictFilteredHeaderOmitsUnscopedCost(t *testing.T) {
+	var costRequests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(storage.CostAggregate{
-			TotalUSD: 9.99, JobsWithCost: 2, JobsTotal: 2, Complete: true,
-		}))
+		costRequests.Add(1)
+		http.Error(w, "unexpected cost request", http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
@@ -101,6 +100,7 @@ func TestVerdictFilteredHeaderOmitsUnscopedCost(t *testing.T) {
 	require.True(t, ok)
 	updated, _ := m.handleCostMsg(msg)
 	m = updated.(model)
+	assert.Zero(t, costRequests.Load(), "verdict-filtered cost fetch must not call the unscoped endpoint")
 
 	header := m.renderQueueStatusLine(m.jobStats.Done, m.jobStats.Closed, m.jobStats.Open)
 	assert.Contains(t, header, "Completed: 1")
