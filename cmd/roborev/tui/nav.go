@@ -223,6 +223,9 @@ func (m *model) normalizeSelectionIfHidden() {
 		if idx >= 0 {
 			m.selectedIdx = idx
 			m.updateSelectedJobID()
+		} else {
+			m.selectedIdx = -1
+			m.selectedJobID = 0
 		}
 	} else if m.selectedJobID != m.jobs[m.selectedIdx].ID {
 		// Resync stale selectedJobID (e.g., a job was removed from

@@ -219,14 +219,15 @@ func (m model) rerunJob(snap rerunSnapshot) tea.Cmd {
 			err = apiStatusError(resp.StatusCode, apiStatus(resp.StatusCode), resp.Body)
 		}
 		return rerunResultMsg{
-			jobID:         snap.jobID,
-			oldState:      snap.oldStatus,
-			oldStartedAt:  snap.oldStartedAt,
-			oldFinishedAt: snap.oldFinishedAt,
-			oldError:      snap.oldError,
-			oldClosed:     snap.oldClosed,
-			oldVerdict:    snap.oldVerdict,
-			err:           err,
+			jobID:            snap.jobID,
+			oldState:         snap.oldStatus,
+			oldStartedAt:     snap.oldStartedAt,
+			oldFinishedAt:    snap.oldFinishedAt,
+			oldError:         snap.oldError,
+			oldClosed:        snap.oldClosed,
+			oldVerdict:       snap.oldVerdict,
+			restoreSelection: snap.restoreSelection,
+			err:              err,
 		}
 	}
 }
@@ -234,13 +235,14 @@ func (m model) rerunJob(snap rerunSnapshot) tea.Cmd {
 // rerunSnapshot captures job state before an optimistic rerun
 // update so it can be rolled back if the server request fails.
 type rerunSnapshot struct {
-	jobID         int64
-	oldStatus     storage.JobStatus
-	oldStartedAt  *time.Time
-	oldFinishedAt *time.Time
-	oldError      string
-	oldClosed     *bool
-	oldVerdict    *string
+	jobID            int64
+	oldStatus        storage.JobStatus
+	oldStartedAt     *time.Time
+	oldFinishedAt    *time.Time
+	oldError         string
+	oldClosed        *bool
+	oldVerdict       *string
+	restoreSelection bool
 }
 
 func (m model) submitComment(jobID int64, text string) tea.Cmd {

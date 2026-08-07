@@ -178,14 +178,15 @@ type pauseResultMsg struct {
 	err    error
 }
 type rerunResultMsg struct {
-	jobID         int64
-	oldState      storage.JobStatus
-	oldStartedAt  *time.Time
-	oldFinishedAt *time.Time
-	oldError      string
-	oldClosed     *bool
-	oldVerdict    *string
-	err           error
+	jobID            int64
+	oldState         storage.JobStatus
+	oldStartedAt     *time.Time
+	oldFinishedAt    *time.Time
+	oldError         string
+	oldClosed        *bool
+	oldVerdict       *string
+	restoreSelection bool
+	err              error
 }
 type (
 	errMsg       error

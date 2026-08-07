@@ -806,6 +806,9 @@ func (m model) handleRerunResultMsg(
 			job.Closed = msg.oldClosed
 			job.Verdict = msg.oldVerdict
 		})
+		if msg.restoreSelection && m.selectJobByID(msg.jobID) {
+			m.normalizeSelectionIfHidden()
+		}
 		m.err = msg.err
 	}
 	return m, nil

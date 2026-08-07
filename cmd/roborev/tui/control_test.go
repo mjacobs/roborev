@@ -875,6 +875,96 @@ func TestHandleRerunKey_ClearsClosedAndVerdict(t *testing.T) {
 		"rerun job should be visible with hideClosed")
 }
 
+func TestRerunVerdictFilterMovesAndRestoresSelectionOnFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/job/rerun", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	for _, tt := range []struct {
+		name       string
+		useControl bool
+	}{
+		{name: "keyboard"},
+		{name: "control", useControl: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel(testEndpointFromURL(server.URL), withExternalIODisabled())
+			m.currentView = viewQueue
+			m.activeVerdictFilter = verdictFilterFail
+			m.jobs = []storage.ReviewJob{
+				makeJob(10, withVerdict("F")),
+				makeJob(20, withVerdict("F")),
+			}
+			m.selectedIdx = 0
+			m.selectedJobID = 10
+
+			var updated model
+			var cmd tea.Cmd
+			if tt.useControl {
+				params, err := json.Marshal(map[string]int64{"job_id": 10})
+				require.NoError(t, err)
+				var resp controlResponse
+				updated, resp, cmd = m.handleCtrlRerunJob(params)
+				require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+			} else {
+				result, rerunCmd := m.handleRerunKey()
+				updated = result.(model)
+				cmd = rerunCmd
+			}
+
+			assert.EqualValues(t, 20, updated.selectedJobID)
+			assert.Equal(t, 1, updated.selectedIdx)
+			assert.False(t, updated.isJobVisible(updated.jobs[0]))
+
+			msg := cmd()
+			rerunResult, ok := msg.(rerunResultMsg)
+			require.True(t, ok, "expected rerunResultMsg, got %T", msg)
+			require.Error(t, rerunResult.err)
+
+			result, _ := updated.handleRerunResultMsg(rerunResult)
+			restored := result.(model)
+			assert.EqualValues(t, 10, restored.selectedJobID)
+			assert.Equal(t, 0, restored.selectedIdx)
+			assert.True(t, restored.isJobVisible(restored.jobs[0]))
+		})
+	}
+}
+
+func TestRerunVerdictFilterClearsSelectionWithoutVisibleNeighbor(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		useControl bool
+	}{
+		{name: "keyboard"},
+		{name: "control", useControl: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel(testEndpoint, withExternalIODisabled())
+			m.currentView = viewQueue
+			m.activeVerdictFilter = verdictFilterFail
+			m.jobs = []storage.ReviewJob{makeJob(10, withVerdict("F"))}
+			m.selectedIdx = 0
+			m.selectedJobID = 10
+
+			if tt.useControl {
+				params, err := json.Marshal(map[string]int64{"job_id": 10})
+				require.NoError(t, err)
+				updated, resp, _ := m.handleCtrlRerunJob(params)
+				require.True(t, resp.OK, "expected OK, got error: %s", resp.Error)
+				m = updated
+			} else {
+				result, _ := m.handleRerunKey()
+				m = result.(model)
+			}
+
+			assert.Equal(t, -1, m.selectedIdx)
+			assert.Zero(t, m.selectedJobID)
+		})
+	}
+}
+
 func TestRerunResultMsg_RestoresClosedOnFailure(t *testing.T) {
 	verdict := "FAIL"
 	closed := true

@@ -623,6 +623,10 @@ func (m model) handleCtrlRerunJob(
 	// the local optimistic state consistent until the next fetch.
 	job.Closed = nil
 	job.Verdict = nil
+	if m.selectedJobID == job.ID && !m.isJobVisible(*job) {
+		m.normalizeSelectionIfHidden()
+		snap.restoreSelection = true
+	}
 
 	return m, controlResponse{OK: true}, m.rerunJob(snap)
 }
