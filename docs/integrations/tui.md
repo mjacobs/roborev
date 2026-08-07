@@ -164,9 +164,10 @@ time to show every verdict. Combine `H` on its failing state with `h` to show
 only open failing reviews. When active, the queue title shows `[H: FAIL]` or
 `[H: PASS]` so the verdict scope remains visible.
 
-`Esc` clears filters one layer at a time in the order they were applied. Press
-`h` again to toggle hide-closed off directly. The verdict filter participates in
-the same Escape stack, so `Esc` clears the most recently applied scope.
+`Esc` clears stacked repo, branch, and verdict filters one layer at a time, with
+the most recently applied filter cleared first. Hide-closed stays outside that
+stack: after all stacked filters are gone, a further `Esc` disables hide-closed,
+regardless of when you pressed `h`. Press `h` again to disable it directly.
 
 ## Distraction-Free Mode
 

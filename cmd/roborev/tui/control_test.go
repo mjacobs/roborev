@@ -932,6 +932,45 @@ func TestRerunVerdictFilterMovesAndRestoresSelectionOnFailure(t *testing.T) {
 	}
 }
 
+func TestRerunVerdictFilterFailurePreservesSelectionAfterMovingAwayAndBack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	m := newModel(testEndpointFromURL(server.URL), withExternalIODisabled())
+	m.currentView = viewQueue
+	m.activeVerdictFilter = verdictFilterFail
+	m.jobs = []storage.ReviewJob{
+		makeJob(10, withVerdict("F")),
+		makeJob(20, withVerdict("F")),
+		makeJob(30, withVerdict("F")),
+	}
+	m.selectedIdx = 0
+	m.selectedJobID = 10
+
+	result, cmd := m.handleRerunKey()
+	updated := result.(model)
+	require.EqualValues(t, 20, updated.selectedJobID)
+
+	result, _ = updated.handleDownKey()
+	updated = result.(model)
+	require.EqualValues(t, 30, updated.selectedJobID)
+	result, _ = updated.handleUpKey()
+	updated = result.(model)
+	require.EqualValues(t, 20, updated.selectedJobID)
+
+	msg := cmd()
+	rerunResult, ok := msg.(rerunResultMsg)
+	require.True(t, ok, "expected rerunResultMsg, got %T", msg)
+	require.Error(t, rerunResult.err)
+
+	result, _ = updated.handleRerunResultMsg(rerunResult)
+	restored := result.(model)
+	assert.EqualValues(t, 20, restored.selectedJobID,
+		"a late rerun failure must not replace a selection the user revisited")
+}
+
 func TestRerunVerdictFilterClearsSelectionWithoutVisibleNeighbor(t *testing.T) {
 	for _, tt := range []struct {
 		name       string

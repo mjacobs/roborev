@@ -255,6 +255,7 @@ func (m *model) reconcileAutoRepoFilter() bool {
 }
 
 func (m *model) resetQueueForFilterChange() {
+	m.queueStateGen++
 	m.jobs = nil
 	m.hasMore = false
 	m.loadingMore = false

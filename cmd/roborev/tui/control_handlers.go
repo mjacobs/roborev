@@ -361,8 +361,7 @@ func (m model) handleCtrlSelectJob(
 					),
 				}, nil
 			}
-			m.selectedIdx = i
-			m.selectedJobID = params.JobID
+			m = m.moveSelectionToJobID(params.JobID)
 			return m, controlResponse{OK: true}, nil
 		}
 	}
@@ -626,6 +625,8 @@ func (m model) handleCtrlRerunJob(
 	if m.selectedJobID == job.ID && !m.isJobVisible(*job) {
 		m.normalizeSelectionIfHidden()
 		snap.restoreSelection = true
+		snap.fallbackSelection = m.selectedJobID
+		snap.queueStateGen = m.queueStateGen
 	}
 
 	return m, controlResponse{OK: true}, m.rerunJob(snap)

@@ -311,6 +311,9 @@ func (m model) fetchMoreJobs() tea.Cmd {
 // or bogus data.
 func (m model) fetchCost() tea.Cmd {
 	seq := m.fetchSeq
+	if m.activeVerdictFilter != "" {
+		return func() tea.Msg { return costMsg{cost: nil, seq: seq} }
+	}
 	var query daemonclient.GetCostQuery
 	if len(m.activeRepoFilter) > 0 {
 		query.Repo = append([]string(nil), m.activeRepoFilter...)

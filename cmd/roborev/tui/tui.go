@@ -269,6 +269,7 @@ type model struct {
 	status           storage.DaemonStatus
 	selectedIdx      int
 	selectedJobID    int64                          // Track selected job by ID to maintain position on refresh
+	queueStateGen    uint64                         // increments on user-visible queue selection/filter changes
 	expandedPanels   map[string]bool                // panel_run_uuid -> expanded
 	panelMembers     map[string][]storage.ReviewJob // panel_run_uuid -> side-fetched members
 	currentView      viewKind

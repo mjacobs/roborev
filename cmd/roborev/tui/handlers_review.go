@@ -170,6 +170,8 @@ func (m model) handleRerunKey() (tea.Model, tea.Cmd) {
 		if m.selectedJobID == job.ID && !m.isJobVisible(*job) {
 			m.normalizeSelectionIfHidden()
 			snap.restoreSelection = true
+			snap.fallbackSelection = m.selectedJobID
+			snap.queueStateGen = m.queueStateGen
 		}
 		return m, m.rerunJob(snap)
 	}

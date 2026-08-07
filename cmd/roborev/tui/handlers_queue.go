@@ -38,6 +38,9 @@ func (m *model) handleQueueMouseClick(_ int, y int) {
 // moveSelectionToJobID sets selectedJobID to id (authoritative) and resyncs
 // selectedIdx best-effort (the m.jobs index, or -1 for a panel member).
 func (m model) moveSelectionToJobID(id int64) model {
+	if m.selectedJobID != id {
+		m.queueStateGen++
+	}
 	m.selectedJobID = id
 	m.selectedIdx = -1
 	for i := range m.jobs {
