@@ -230,10 +230,17 @@ func TestHandleListJobsVerdictFilter(t *testing.T) {
 			require.NoError(t, db.MarkReviewClosedByJobID(job.ID, true))
 		}
 	}
+	unscored, err := db.EnqueueJob(storage.EnqueueOpts{
+		RepoID: repo.ID, GitRef: "verdict-unscored", Agent: "test",
+	})
+	require.NoError(t, err)
 
 	failing := fetchJobs(t, server, "verdict=fail")
 	assert.Len(t, failing.Jobs, 2)
 	assert.Equal(t, storage.JobStats{Done: 2, Closed: 1, Open: 1}, failing.Stats)
+	for _, job := range failing.Jobs {
+		assert.NotEqual(t, unscored.ID, job.ID)
+	}
 
 	openFailing := fetchJobs(t, server, "verdict=fail&closed=false")
 	require.Len(t, openFailing.Jobs, 1)
@@ -242,6 +249,9 @@ func TestHandleListJobsVerdictFilter(t *testing.T) {
 
 	passing := fetchJobs(t, server, "verdict=pass")
 	assert.Len(t, passing.Jobs, 1)
+	for _, job := range passing.Jobs {
+		assert.NotEqual(t, unscored.ID, job.ID)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/jobs?verdict=maybe", nil)
 	w := httptest.NewRecorder()
