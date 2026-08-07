@@ -57,6 +57,9 @@ REPORT.md
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
 
+# Local git worktrees
+/.worktrees/
+
 # Dolt database files (added by bd init)
 .dolt/
 *.db
